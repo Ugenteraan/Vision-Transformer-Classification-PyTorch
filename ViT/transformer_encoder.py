@@ -15,7 +15,7 @@ class TransformerBlock(nn.Module):
     '''
 
 
-    def __init__(self, embedding_dim, num_heads, attn_dropout_prob, mlp_ratio, feedforward_dropout_prob, device):
+    def __init__(self, embedding_dim, num_heads, attn_dropout_prob, mlp_ratio, feedforward_dropout_prob, device, **kwargs):
 
         super(TransformerBlock, self).__init__()
 

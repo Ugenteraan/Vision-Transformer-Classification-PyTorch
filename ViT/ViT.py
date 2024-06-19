@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 from .patch_embedding import PatchEmbedding
 from .transformer_encoder import TransformerNetwork
+from .mlp_head import MLPHead
 
 
 class VisionTransformer(nn.Sequential):
@@ -15,8 +16,7 @@ class VisionTransformer(nn.Sequential):
     '''
 
     def __init__(self, 
-    			image_height, 
-    			image_width, 
+    			image_size, 
     			image_depth, 
     			patch_size,
     			embedding_dim, 
@@ -29,8 +29,7 @@ class VisionTransformer(nn.Sequential):
 
         
         super().__init__(
-                PatchEmbedding(image_height=image_height, 
-                			   image_width=image_width, 
+                PatchEmbedding(image_size=image_size, 
                 			   image_depth=image_depth, 
                 			   patch_size=patch_size, 
                 			   embedding_dim=embedding_dim,

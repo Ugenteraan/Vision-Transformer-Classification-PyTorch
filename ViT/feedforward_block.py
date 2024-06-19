@@ -9,14 +9,14 @@ import torch.nn as nn
 
 class FeedForwardBlock(nn.Sequential):
 
-    def __init__(self, input_dim, mlp_ratio, feedforward_dropout_prob, device):
+    def __init__(self, embedding_dim, mlp_ratio, feedforward_dropout_prob, device, **kwargs):
 
         #let's define the sequence using the nn.sequential's init itself.
         super().__init__(
-                nn.Linear(input_dim, input_dim*mlp_ratio).to(device),
+                nn.Linear(embedding_dim, embedding_dim*mlp_ratio).to(device),
                 nn.GELU(),
                 nn.Dropout(feedforward_dropout_prob).to(device),
-                nn.Linear(input_dim*mlp_ratio, input_dim).to(device)
+                nn.Linear(embedding_dim*mlp_ratio, embedding_dim).to(device)
                 )
 
 

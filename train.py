@@ -18,11 +18,9 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.profiler import profile, record_function, ProfilerActivity
 
 
-from models.ViT import VisionTransformer
+from ViT.ViT import VisionTransformer
 from load_dataset import LoadLabelledDataset
 from utils import load_checkpoint, save_checkpoint
-from visualize_prediction import VisualizePrediction
-import cred
 
 def main(args):
 
@@ -70,6 +68,7 @@ def main(args):
     #@@@@@@@@@@@@@@@@@@@@@@@@@ Extract the configurations from YAML file @@@@@@@@@@@@@@@@@@@@@@
 
     #Data configurations.
+    NUM_CLASSES = config['data']['num_classes']
     BATCH_SIZE = config['data']['batch_size']
     IMAGE_SIZE = config['data']['image_size']
     IMAGE_DEPTH = config['data']['image_depth']
@@ -82,6 +81,7 @@ def main(args):
     RANDOM_AFFINE_SCALE = config['data']['random_affine']['scale']
     COLOR_JITTER_BRIGHTNESS = config['data']['color_jitter']['brightness']
     COLOR_JITTER_HUE = config['data']['color_jitter']['hue']
+    PATCH_SIZE = config['data']['patch_size']
 
 
     #Model configurations.
@@ -89,10 +89,10 @@ def main(args):
     MODEL_NAME = config['model']['model_name']
     MODEL_SAVE_FREQ = config['model']['model_save_freq']
     N_SAVED_MODEL_TO_KEEP = config['model']['N_saved_model_to_keep']
-    TRANSFORMER_BLOCKS_DEPTH = config['model']['encoder_transformer_blocks_depth']
-    EMBEDDING_DIM = config['model']['encoder_embedding_dim']
-    MLP_RATIO = config['model']['encoder_mlp_ratio']
-    NUM_HEADS = config['model']['encoder_num_heads']
+    TRANSFORMER_BLOCKS_DEPTH = config['model']['transformer_blocks_depth']
+    EMBEDDING_DIM = config['model']['embedding_dim']
+    MLP_RATIO = config['model']['mlp_ratio']
+    NUM_HEADS = config['model']['num_heads']
     ATTN_DROPOUT_PROB = config['model']['attn_dropout_prob']
     FEEDFORWARD_DROPOUT_PROB = config['model']['feedforward_dropout_prob']
 
@@ -131,24 +131,19 @@ def main(args):
 
     logger.info("Init ViT model...")
     
-    VIT_MODEL = VIT(patch_size=PATCH_SIZE, 
-                  image_size=IMAGE_SIZE, 
-                  image_depth=IMAGE_DEPTH,
-                  encoder_embedding_dim=ENCODER_EMBEDDING_DIM, 
-                  decoder_embedding_dim=DECODER_EMBEDDING_DIM, 
-                  encoder_transformer_blocks_depth=ENCODER_TRANSFORMER_BLOCKS_DEPTH, 
-                  decoder_transformer_blocks_depth=DECODER_TRANSFORMER_BLOCKS_DEPTH, 
-                  masking_ratio=MASKING_RATIO,
-                  normalize_pixel=NORMALIZE_PIXEL,
-                  device=DEVICE,
-                  encoder_mlp_ratio=ENCODER_MLP_RATIO, 
-                  decoder_mlp_ratio=DECODER_MLP_RATIO,
-                  encoder_num_heads=ENCODER_NUM_HEADS,
-                  decoder_num_heads=DECODER_NUM_HEADS, 
-                  attn_dropout_prob=ATTN_DROPOUT_PROB,
-                  feedforward_dropout_prob=FEEDFORWARD_DROPOUT_PROB,
-                  logger=logger).to(DEVICE, non_blocking=True)
-    
+    VIT_MODEL = VisionTransformer(patch_size=PATCH_SIZE, 
+                                  image_size=IMAGE_SIZE, 
+                                  image_depth=IMAGE_DEPTH,
+                                  embedding_dim=EMBEDDING_DIM,  
+                                  transformer_network_depth=TRANSFORMER_BLOCKS_DEPTH, 
+                                  device=DEVICE,
+                                  mlp_ratio=MLP_RATIO, 
+                                  num_heads=NUM_HEADS,
+                                  attn_dropout_prob=ATTN_DROPOUT_PROB,
+                                  feedforward_dropout_prob=FEEDFORWARD_DROPOUT_PROB,
+                                  num_classes=NUM_CLASSES,
+                                  logger=logger).to(DEVICE, non_blocking=True)
+                    
 
     if USE_PROFILER:
         sample_inp = torch.randn(2, IMAGE_DEPTH, IMAGE_SIZE, IMAGE_SIZE, requires_grad=False)
@@ -166,6 +161,7 @@ def main(args):
         sample_inp = torch.zeros(2, IMAGE_DEPTH, IMAGE_SIZE, IMAGE_SIZE, requires_grad=False).to(DEVICE)
         
         with torch.no_grad():
+            VIT_MODEL.eval()
             TB_WRITER.add_graph(VIT_MODEL, sample_inp)
 
 
@@ -173,7 +169,7 @@ def main(args):
     DATASET_MODULE = LoadLabelledDataset(dataset_folder_path=DATASET_FOLDER, 
                                        image_size=224, 
                                        image_depth=3, 
-                                       transforms=transforms.Compose([transforms.Resize((self.image_size, self.image_size)),
+                                       transforms=transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                                                                       transforms.ColorJitter(brightness=COLOR_JITTER_BRIGHTNESS, hue=COLOR_JITTER_HUE),
                                                                       transforms.RandomAffine(degrees=RANDOM_AFFINE_DEGREES, translate=RANDOM_AFFINE_TRANSLATE, scale=RANDOM_AFFINE_SCALE),
                                                                       transforms.ToTensor(),
@@ -189,7 +185,7 @@ def main(args):
     
 
     OPTIMIZER = torch.optim.AdamW(params=VIT_MODEL.parameters(), 
-                                  lr=COSINE_UPPER_BOUND_WD, 
+                                  lr=COSINE_UPPER_BOUND_LR, 
                                   weight_decay=WEIGHT_DECAY)
 
     SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=OPTIMIZER, 

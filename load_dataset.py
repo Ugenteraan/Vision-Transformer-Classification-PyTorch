@@ -15,14 +15,14 @@ class LoadLabelledDataset(Dataset):
     '''Loads the dataset from the given path. 
     '''
 
-    def __init__(self, dataset_folder_path, image_size=224, image_depth=3, train=True, transform=None, logger=None):
+    def __init__(self, dataset_folder_path, image_size=224, image_depth=3, train=True, transforms=None, logger=None):
         '''Parameter Init.
         '''
 
         assert not dataset_folder_path is None, "Path to the dataset folder must be provided!"
 
         self.dataset_folder_path = dataset_folder_path
-        self.transform = transform
+        self.transforms = transforms
         self.image_size = image_size
         self.image_depth = image_depth
         self.train = train
@@ -84,10 +84,10 @@ class LoadLabelledDataset(Dataset):
             
 
 
-        if self.transform:
-            image = self.transform(image)
+        if self.transforms:
+            image = self.transforms(image)
 
         return {
-            'image': image,
-            'label': label
+            'images': image,
+            'labels': label
         }

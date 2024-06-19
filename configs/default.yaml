@@ -1,9 +1,11 @@
 #Configurations
 env: development
 data:
+  num_classes: 77
   batch_size: 128
   image_size: 224
   image_depth: 3
+  patch_size: 14
   dataset_folder: ./dataset/
   num_workers: 8
   shuffle: true
@@ -27,8 +29,8 @@ model:
   model_save_freq: 2 #save every N epoch.
   N_saved_model_to_keep: 20 #keep the last N number of saved models and delete the earlier ones.
   model_name: vit-dog-breed
-  encoder_transformer_depth: 8
-  encoder_network_embedding_dim: 1024 #embedding dimension to be used throughout the transformer blocks in the encoder network.
+  transformer_blocks_depth: 8
+  embedding_dim: 1024 #embedding dimension to be used throughout the transformer blocks in the encoder network.
   projection_keys_dim : 256
   projection_values_dim : 256
   mlp_ratio : 4 
@@ -44,14 +46,14 @@ training:
   end_epoch : 1000
   cosine_upper_bound_lr : 1.0e-4
   cosine_lower_bound_lr : 1.0e-6
-  cosine_upper_bound_wd : 0.4
-  cosine_lower_bound_wd : 0.04
+  weight_decay : 0.04
   num_epoch_to_restart_lr : 5 #will be multiplied by iterations per epoch later since we're using the scale of steps for everything in the code.
   warmup_start_lr : 5.0e-6 #learning rate starts here.
   warmup_steps : 100 #iteration step. Not epoch step.
   use_bfloat16: true
   use_neptune: false
-  use_tensorboar: true
+  use_tensorboard: false
+  use_profiler: true
 
 
 
