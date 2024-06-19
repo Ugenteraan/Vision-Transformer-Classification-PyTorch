@@ -40,6 +40,7 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x):
 
+        
         multihead_attention_output = self.multi_head_attention_block(x)
         multihead_attention_output += x #skip connection 
 
@@ -56,6 +57,7 @@ class TransformerNetwork(nn.Sequential):
     '''
     
     def __init__(self, transformer_network_depth, embedding_dim, device, **kwargs):
+
 
         super().__init__(*[TransformerBlock(embedding_dim=embedding_dim,
                                             device=device,

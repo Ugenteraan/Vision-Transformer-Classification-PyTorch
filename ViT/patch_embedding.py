@@ -24,6 +24,7 @@ class PatchEmbedding(nn.Module):
                  image_size, 
                  image_depth, 
                  embedding_dim, 
+                 use_tensorboard,
                  device=None):
         '''Init variables.
         '''
@@ -44,7 +45,7 @@ class PatchEmbedding(nn.Module):
                                                             n=10000, 
                                                             device=self.device)
 
-        self.cls_token = nn.Parameter(torch.randn(1, 1, embedding_dim), requires_grad=True).to(self.device)
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embedding_dim), requires_grad=not use_tensorboard).to(self.device)
 
         if not embedding_dim is None:
             self.patch_linear_layer = nn.Linear(in_features=patch_size*patch_size*image_depth, out_features=embedding_dim, bias=True).to(device) #to linearly project the patches. 
@@ -88,7 +89,7 @@ class PatchEmbedding(nn.Module):
 
         stacked_pos_enc_tensor = einops.repeat(positional_encoding_tensor.unsqueeze(0), '() p e -> b p e', b=patched_image_tensors.size(0))
 
-        print(cls_token_concat_tensors.size(), stacked_pos_enc_tensor.size())
+        
         patch_embeddings = torch.add(cls_token_concat_tensors, stacked_pos_enc_tensor)
 
         return patch_embeddings

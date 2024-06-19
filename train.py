@@ -127,7 +127,7 @@ def main(args):
 
 
     if USE_TENSORBOARD:
-        TB_WRITER = writer = SummaryWriter(f'runs/vit-{DATETIME_NOW}')
+        TB_WRITER = writer = SummaryWriter(f'runs/vit')
 
     logger.info("Init ViT model...")
     
@@ -142,7 +142,8 @@ def main(args):
                                   attn_dropout_prob=ATTN_DROPOUT_PROB,
                                   feedforward_dropout_prob=FEEDFORWARD_DROPOUT_PROB,
                                   num_classes=NUM_CLASSES,
-                                  logger=logger).to(DEVICE, non_blocking=True)
+                                  use_tensorboard=False, #for tensorboard to work properly, some random parameters have to have their gradients disabled temporarily. Here, we set to False since this is our main model. For tensorboard however, we set to True (if using) temporarily.
+                                  logger=logger).to(DEVICE)
                     
 
     if USE_PROFILER:
@@ -160,26 +161,56 @@ def main(args):
     if USE_TENSORBOARD:
         sample_inp = torch.zeros(2, IMAGE_DEPTH, IMAGE_SIZE, IMAGE_SIZE, requires_grad=False).to(DEVICE)
         
-        with torch.no_grad():
-            VIT_MODEL.eval()
-            TB_WRITER.add_graph(VIT_MODEL, sample_inp)
+        VIT_MODEL_TENSORBOARD = VisionTransformer(patch_size=PATCH_SIZE, 
+                                  image_size=IMAGE_SIZE, 
+                                  image_depth=IMAGE_DEPTH,
+                                  embedding_dim=EMBEDDING_DIM,  
+                                  transformer_network_depth=TRANSFORMER_BLOCKS_DEPTH, 
+                                  device=DEVICE,
+                                  mlp_ratio=MLP_RATIO, 
+                                  num_heads=NUM_HEADS,
+                                  attn_dropout_prob=ATTN_DROPOUT_PROB,
+                                  feedforward_dropout_prob=FEEDFORWARD_DROPOUT_PROB,
+                                  num_classes=NUM_CLASSES,
+                                  use_tensorboard=True, #for tensorboard to work properly, some random parameters have to have their gradients disabled temporarily.
+                                  logger=logger).to(DEVICE)
+        
+        TB_WRITER.add_graph(VIT_MODEL_TENSORBOARD, sample_inp)
 
 
 
-    DATASET_MODULE = LoadLabelledDataset(dataset_folder_path=DATASET_FOLDER, 
-                                       image_size=224, 
-                                       image_depth=3, 
-                                       transforms=transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-                                                                      transforms.ColorJitter(brightness=COLOR_JITTER_BRIGHTNESS, hue=COLOR_JITTER_HUE),
-                                                                      transforms.RandomAffine(degrees=RANDOM_AFFINE_DEGREES, translate=RANDOM_AFFINE_TRANSLATE, scale=RANDOM_AFFINE_SCALE),
-                                                                      transforms.ToTensor(),
-                                                                      transforms.Lambda(lambda x: x.repeat(int(3/x.shape[0]), 1, 1)), #to turn grayscale arrays into compatible RGB arrays.
-                                                                      transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]),
-                                       logger=logger)
+    TRAIN_DATASET_MODULE = LoadLabelledDataset(dataset_folder_path=DATASET_FOLDER, 
+                                           image_size=224, 
+                                           image_depth=3, 
+                                           transforms=transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+                                                                          transforms.ColorJitter(brightness=COLOR_JITTER_BRIGHTNESS, hue=COLOR_JITTER_HUE),
+                                                                          transforms.RandomAffine(degrees=RANDOM_AFFINE_DEGREES, translate=RANDOM_AFFINE_TRANSLATE, scale=RANDOM_AFFINE_SCALE),
+                                                                          transforms.ToTensor(),
+                                                                          transforms.Lambda(lambda x: x.repeat(int(3/x.shape[0]), 1, 1)), #to turn grayscale arrays into compatible RGB arrays.
+                                                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]),
+                                           logger=logger)
 
-    DATALOADER = DataLoader(DATASET_MODULE, 
+    TRAIN_DATASET_MODULE = LoadLabelledDataset(dataset_folder_path=DATASET_FOLDER, 
+                                           image_size=224, 
+                                           image_depth=3, 
+                                           train=False,
+                                           transforms=transforms.Compose([transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+                                                                          transforms.ToTensor(),
+                                                                          transforms.Lambda(lambda x: x.repeat(int(3/x.shape[0]), 1, 1)), #to turn grayscale arrays into compatible RGB arrays.
+                                                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]),
+                                           logger=logger)
+
+
+
+    TRAIN_DATALOADER = DataLoader(TRAIN_DATASET_MODULE, 
                             batch_size=BATCH_SIZE, 
                             shuffle=SHUFFLE, 
+                            num_workers=NUM_WORKERS)
+
+
+    TEST_DATALOADER = DataLoader(TRAIN_DATASET_MODULE, 
+                            batch_size=BATCH_SIZE, 
+                            shuffle=False, 
                             num_workers=NUM_WORKERS)
 
     
@@ -223,17 +254,17 @@ def main(args):
         
 
         try:
-            for idx, data in tqdm(enumerate(DATALOADER)):   
+            for idx, data in tqdm(enumerate(TRAIN_DATALOADER)):   
          
 
                 images = data['images'].to(DEVICE)
                 labels = data['labels'].to(DEVICE)
 
                 with torch.cuda.amp.autocast(dtype=torch.bfloat16, enabled=USE_BFLOAT16):
-                    preds = VIT_MODEL(x=images)
+                    preds = VIT_MODEL(images)
                     
                 
-                loss = CRITERION(Input=preds, Target=labels)
+                loss = CRITERION(preds, labels)
 
                 #backward and step
                 if USE_BFLOAT16:
@@ -250,7 +281,7 @@ def main(args):
                 epoch_loss += loss.item()
 
             
-            SCEHDULER.step()
+            SCHEDULER.step()
 
             if USE_NEPTUNE:
                 NEPTUNE_RUN['train/learning_rate'].append(OPTIMIZER.param_groups[0]["lr"])
@@ -283,13 +314,55 @@ def main(args):
             
         
 
+        VIT_MODEL.eval()
+        epoch_test_loss = 0
+        try:
+
+            with torch.no_grad():
+                for idx, data in tqdm(enumerate(TEST_DATALOADER)):   
+             
+
+                    images = data['images'].to(DEVICE)
+                    labels = data['labels'].to(DEVICE)
+
+                    with torch.cuda.amp.autocast(dtype=torch.bfloat16, enabled=USE_BFLOAT16):
+                        preds = VIT_MODEL(images)
+                        
+                    
+                    loss = CRITERION(preds, labels)   
+                    
+                    epoch_test_loss += loss.item()
+
+            
+
+            
+        except Exception as err:
+
+            logger.error(f"Testing stopped at epoch {epoch_idx} due to {err}")
+
+            if USE_NEPTUNE: 
+                NEPTUNE_RUN.stop() 
+
+            if USE_TENSORBOARD:
+                TB_WRITER.close()
+
+            sys.exit()
+
+            
+        logger.info(f"The Testing loss at epoch {epoch_idx} is : {epoch_test_loss}")
+
+        if USE_TENSORBOARD:
+            TB_WRITER.add_scalar("Loss/test", epoch_test_loss, epoch_idx)
+        
+        if USE_NEPTUNE:
+            NEPTUNE_RUN['test/loss_per_epoch'].append(epoch_test_loss)
+
         
         if epoch_idx % MODEL_SAVE_FREQ == 0:
             
             save_checkpoint(model_save_folder=MODEL_SAVE_FOLDER, 
                     model_name=MODEL_NAME, 
                     VIT_MODEL=VIT_MODEL, 
-                    scaler=SCALER, 
                     epoch=epoch_idx, 
                     loss=epoch_loss, 
                     N_models_to_keep=N_SAVED_MODEL_TO_KEEP, 

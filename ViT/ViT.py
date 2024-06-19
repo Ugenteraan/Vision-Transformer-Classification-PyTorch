@@ -22,6 +22,7 @@ class VisionTransformer(nn.Sequential):
     			embedding_dim, 
     			transformer_network_depth, 
     			num_classes, 
+                use_tensorboard,
     			device, 
     			**kwargs):
         '''Combines all the modules in sequence.
@@ -33,13 +34,14 @@ class VisionTransformer(nn.Sequential):
                 			   image_depth=image_depth, 
                 			   patch_size=patch_size, 
                 			   embedding_dim=embedding_dim,
-                			   device=device).to(device),
-
+                			   device=device,
+                               use_tensorboard=use_tensorboard).to(device),
+                
                 TransformerNetwork(transformer_network_depth=transformer_network_depth, 
                 				   embedding_dim=embedding_dim, 
         						   device=device, 
         						   **kwargs).to(device),
-
+                
                 MLPHead(embedding_dim=embedding_dim, 
                 		num_classes=num_classes).to(device)
                 )

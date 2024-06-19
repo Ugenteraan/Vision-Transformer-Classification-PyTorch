@@ -25,6 +25,7 @@ class MLPHead(nn.Module):
 
 
     def forward(self, x):
+       
         extracted_cls_token = x[:, 0, :].squeeze(1) #first position in the patch num dimension. That's where the CLS token was initialized. Should be the size of [batch size, patch embedding] since we removed the 1 in the first dimension.
 
         out = self.classification_head(extracted_cls_token)
