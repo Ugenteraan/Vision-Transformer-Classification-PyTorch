@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import torch.nn as nn
 from .patch_embedding import PatchEmbedding
-
+from .transformer_encoder import TransformerNetwork
 
 
 class VisionTransformer(nn.Sequential):
@@ -36,12 +36,12 @@ class VisionTransformer(nn.Sequential):
                 			   embedding_dim=embedding_dim,
                 			   device=device).to(device),
 
-                TransformerEncoderNetwork(transformer_network_depth=transformer_network_depth, 
-                						  patch_embedding_dim=patch_embedding_dim, 
-                						  device=device, 
-                						  **kwargs).to(device),
+                TransformerNetwork(transformer_network_depth=transformer_network_depth, 
+                				   embedding_dim=embedding_dim, 
+        						   device=device, 
+        						   **kwargs).to(device),
 
-                MLPHead(patch_embedding_dim=patch_embedding_dim, 
+                MLPHead(embedding_dim=embedding_dim, 
                 		num_classes=num_classes).to(device)
                 )
 

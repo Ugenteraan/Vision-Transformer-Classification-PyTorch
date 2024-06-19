@@ -15,14 +15,14 @@ class TransformerBlock(nn.Module):
     '''
 
 
-    def __init__(self, input_dim, num_heads, attn_dropout_prob, mlp_ratio, feedforward_dropout_prob, device):
+    def __init__(self, embedding_dim, num_heads, attn_dropout_prob, mlp_ratio, feedforward_dropout_prob, device):
 
         super(TransformerBlock, self).__init__()
 
         #initialize the self attention module together with a layernorm layer.
         self.multi_head_attention_block = nn.Sequential(
-                                                        nn.LayerNorm(input_dim),
-                                                        MultiHeadAttention(input_dim=input_dim,
+                                                        nn.LayerNorm(embedding_dim),
+                                                        MultiHeadAttention(embedding_dim=embedding_dim,
                                                                            num_heads=num_heads,
                                                                            attn_dropout_prob=attn_dropout_prob,
                                                                            device=device).to(device)
@@ -30,8 +30,8 @@ class TransformerBlock(nn.Module):
 
         #initialize the feedforward block together with a layernorm layer.
         self.feedforward_block = nn.Sequential(
-                                                nn.LayerNorm(input_dim),
-                                                FeedForwardBlock(input_dim=input_dim,
+                                                nn.LayerNorm(embedding_dim),
+                                                FeedForwardBlock(embedding_dim=embedding_dim,
                                                                  mlp_ratio=mlp_ratio,
                                                                  feedforward_dropout_prob=feedforward_dropout_prob, 
                                                                  device=device).to(device)
@@ -55,12 +55,12 @@ class TransformerNetwork(nn.Sequential):
     '''Created a network of transformers using the TransformerBlock module with the given depth.
     '''
     
-    def __init__(self, transformer_network_depth, input_dim, device, **kwargs):
+    def __init__(self, transformer_network_depth, embedding_dim, device, **kwargs):
 
-        super().__init__(*[TransformerBlock(input_dim=input_dim,
-                                                   device=device,
-                                                   **kwargs
-                                                   ).to(device) for _ in range(transformer_network_depth)])
+        super().__init__(*[TransformerBlock(embedding_dim=embedding_dim,
+                                            device=device,
+                                            **kwargs
+                                            ).to(device) for _ in range(transformer_network_depth)])
 
 
 

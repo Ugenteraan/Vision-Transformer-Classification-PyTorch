@@ -8,7 +8,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import torch.nn as nn
 import einops.layers.torch as einops_torch
-# import einops
+import einops
+
+from .positional_encoder import PositionalEncoder
 
 
 class PatchEmbedding(nn.Module):
@@ -21,7 +23,7 @@ class PatchEmbedding(nn.Module):
                  patch_size, 
                  image_size, 
                  image_depth, 
-                 embedding_dim=None, 
+                 embedding_dim, 
                  device=None):
         '''Init variables.
         '''
@@ -33,6 +35,11 @@ class PatchEmbedding(nn.Module):
         self.folding_func = nn.Fold(output_size=(image_size, image_size), kernel_size=(patch_size, patch_size), stride=(patch_size, patch_size)).to(device)
         self.einops_rearrange = einops_torch.Rearrange('b e p -> b p e').to(device) #this is to change the position of the embedding and the number of patches dimension after Unfold.
         
+        self.positional_encoding_module = PositionalEncoder(token_length=cls_token_concat_tensors.size(1), 
+                                                            output_dim=cls_token_concat_tensors.size(2), 
+                                                            n=1000, 
+                                                            device=self.device)
+
         if not embedding_dim is None:
             self.patch_linear_layer = nn.Linear(in_features=patch_size*patch_size*image_depth, out_features=embedding_dim, bias=True).to(device) #to linearly project the patches. 
 
@@ -65,10 +72,15 @@ class PatchEmbedding(nn.Module):
         '''
         
         patched_image_tensors = self.get_non_overlapping_patches(x)
-        linear_projected_patches = self.patch_linear_layer(patched_image_tensors)
+        linear_projected_patches = self.patch_linear_layer(patched_image_tensors).to(self.device)
+
+        cls_token = nn.Parameter(torch.randn(1, 1, self.embedding_dim)).to(self.device)
+        batched_cls_token = einops.repeat(cls_token, '() n e -> b n e', b=linear_projected_patches.size(0))
+
+        cls_concat_tensor = torch.cat([batched_cls_token, linear_projected_patches], dim=1)
 
 
-        return linear_projected_patches.to(self.device)
+        self.positional_encoding_tensor = positional_encoding_module()
 
 
     

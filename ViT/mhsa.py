@@ -15,13 +15,13 @@ class MultiHeadAttention(nn.Module):
     '''Einops implementation of multi-head self attention.
     '''
 
-    def __init__(self, input_dim, num_heads, attn_dropout_prob, device):
+    def __init__(self, embedding_dim, num_heads, attn_dropout_prob, device):
 
         super(MultiHeadAttention, self).__init__()
 
-        self.input_dim = input_dim
+        self.embedding_dim = embedding_dim
         self.num_heads = num_heads
-        self.head_dim = input_dim//num_heads
+        self.head_dim = embedding_dim//num_heads
         self.projection_keys_dim = self.head_dim
         self.projection_values_dim = self.head_dim
         self.attn_dropout_prob = attn_dropout_prob
@@ -30,13 +30,13 @@ class MultiHeadAttention(nn.Module):
         
         #we can simplify the operation by multiplying the projection dimension by 2 and separate the query and keys since they are both projected to the same dimension.
         #if the values were projected to the same dimension we could have simply multiplied by 3 and performed the same operation. But we want to allow flexibility by for the value dimension (projected).
-        self.Wq_Wk = nn.Linear(self.input_dim, self.projection_keys_dim*2).to(device) #weights to project the last dimension of the input tensor to a projecction dimemsion for the query and keys.
-        self.Wv = nn.Linear(self.input_dim, self.projection_values_dim).to(device) #the weight to project the last dimension of the input tensor to a projection dimensions for the values.
+        self.Wq_Wk = nn.Linear(self.embedding_dim, self.projection_keys_dim*2).to(device) #weights to project the last dimension of the input tensor to a projecction dimemsion for the query and keys.
+        self.Wv = nn.Linear(self.embedding_dim, self.projection_values_dim).to(device) #the weight to project the last dimension of the input tensor to a projection dimensions for the values.
 
         self.attention_dropout = nn.Dropout(self.attn_dropout_prob).to(device)
 
         #to project the values' dimension back to the patch embedding dimension.
-        self.W_o = nn.Linear(self.projection_values_dim, self.input_dim).to(device)
+        self.W_o = nn.Linear(self.projection_values_dim, self.embedding_dim).to(device)
 
 
         self.einops_rearrange_qk = einops.Rearrange('b n (h e qk) -> (qk) b h n e', h=self.num_heads, qk=2).to(device) #Einops operation to rearrange the q & k and to create the head dimension.
